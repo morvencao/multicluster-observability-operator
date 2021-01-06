@@ -13,8 +13,11 @@ import (
 	ocpClientSet "github.com/openshift/client-go/config/clientset/versioned"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	storv1 "k8s.io/api/storage/v1"
+	v1 "k8s.io/api/core/v1"
+	storev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +49,7 @@ const (
 var (
 	log                  = logf.Log.WithName("controller_multiclustermonitoring")
 	enableHubRemoteWrite = os.Getenv("ENABLE_HUB_REMOTEWRITE")
+	storageSizeChanged   = false
 )
 
 /**
@@ -90,6 +94,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return true
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
+			if e.MetaOld.(*mcov1beta1.MultiClusterObservability).Spec.StorageConfig.StatefulSetSize !=
+				e.MetaNew.(*mcov1beta1.MultiClusterObservability).Spec.StorageConfig.StatefulSetSize {
+				storageSizeChanged = true
+			}
 			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
@@ -279,6 +287,16 @@ func (r *ReconcileMultiClusterObservability) Reconcile(request reconcile.Request
 	storageClassSelected, err := getStorageClass(instance, r.client)
 	if err != nil {
 		return reconcile.Result{}, err
+	}
+
+	// handle storagesize changes
+	if storageSizeChanged {
+		result, err := r.HandleStorageSizeChange(instance)
+		if result != nil {
+			return *result, err
+		} else {
+			storageSizeChanged = false
+		}
 	}
 
 	//instance.Namespace = config.GetDefaultNamespace()
@@ -654,7 +672,7 @@ func getObjStorageCondition(c client.Client,
 func getStorageClass(mco *mcov1beta1.MultiClusterObservability, cl client.Client) (string, error) {
 	storageClassSelected := mco.Spec.StorageConfig.StatefulSetStorageClass
 	// for the test, the reader is just nil
-	storageClassList := &storv1.StorageClassList{}
+	storageClassList := &storev1.StorageClassList{}
 	err := cl.List(context.TODO(), storageClassList, &client.ListOptions{})
 	if err != nil {
 		return "", err
@@ -673,4 +691,87 @@ func getStorageClass(mco *mcov1beta1.MultiClusterObservability, cl client.Client
 		storageClassSelected = storageClassDefault
 	}
 	return storageClassSelected, nil
+}
+
+// HandleStorageSizeChange is used to deal with the storagesize change in CR
+// 1. Directly changed the StatefulSet pvc's size on the pvc itself for
+// 2. Removed StatefulSet and
+// wait for operator to re-create the StatefulSet with the correct size on the claim
+func (r *ReconcileMultiClusterObservability) HandleStorageSizeChange(mco *mcov1beta1.MultiClusterObservability) (*reconcile.Result, error) {
+	thanosPVCList := &corev1.PersistentVolumeClaimList{}
+	thanosPVCListOpts := []client.ListOption{
+		client.InNamespace(config.GetDefaultNamespace()),
+		client.MatchingLabels(map[string]string{
+			"app.kubernetes.io/instance": config.GetMonitoringCRName() + "-observatorium",
+		}),
+	}
+
+	err := r.client.List(context.TODO(), thanosPVCList, thanosPVCListOpts...)
+	if err != nil {
+		return &reconcile.Result{}, err
+	}
+
+	obsPVCList := &corev1.PersistentVolumeClaimList{}
+	obsPVCListOpts := []client.ListOption{
+		client.InNamespace(config.GetDefaultNamespace()),
+		client.MatchingLabels(map[string]string{
+			"observability.open-cluster-management.io/name": config.GetMonitoringCRName(),
+		}),
+	}
+
+	err = r.client.List(context.TODO(), obsPVCList, obsPVCListOpts...)
+	if err != nil {
+		return &reconcile.Result{}, err
+	}
+
+	obsPVCItems := append(obsPVCList.Items, thanosPVCList.Items...)
+	// updates pvc directly
+	for _, pvc := range obsPVCItems {
+		if !pvc.Spec.Resources.Requests.Storage().Equal(resource.MustParse(mco.Spec.StorageConfig.StatefulSetSize)) {
+			pvc.Spec.Resources.Requests = v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(mco.Spec.StorageConfig.StatefulSetSize),
+			}
+			err = r.client.Update(context.TODO(), &pvc)
+			log.Info("Update storage size for PVC", "pvc", pvc.Name)
+			if err != nil {
+				return &reconcile.Result{}, err
+			}
+		}
+	}
+	// delete the sts which needs to update the volumeClaimTemplates section
+	thanosSTSList := &appsv1.StatefulSetList{}
+	thanosSTSListOpts := []client.ListOption{
+		client.InNamespace(config.GetDefaultNamespace()),
+		client.MatchingLabels(map[string]string{
+			"app.kubernetes.io/instance": config.GetMonitoringCRName() + "-observatorium",
+		}),
+	}
+
+	err = r.client.List(context.TODO(), thanosSTSList, thanosSTSListOpts...)
+	if err != nil {
+		return &reconcile.Result{}, err
+	}
+
+	obsSTSList := &appsv1.StatefulSetList{}
+	obsSTSListOpts := []client.ListOption{
+		client.InNamespace(config.GetDefaultNamespace()),
+		client.MatchingLabels(map[string]string{
+			"observability.open-cluster-management.io/name": config.GetMonitoringCRName(),
+		}),
+	}
+
+	err = r.client.List(context.TODO(), obsSTSList, obsSTSListOpts...)
+	if err != nil {
+		return &reconcile.Result{}, err
+	}
+
+	obsSTSItems := append(obsSTSList.Items, thanosSTSList.Items...)
+	for _, sts := range obsSTSItems {
+		err = r.client.Delete(context.TODO(), &sts, &client.DeleteOptions{})
+		log.Info("Successfully delete sts due to storage size changed", "sts", sts.Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return &reconcile.Result{}, err
+		}
+	}
+	return nil, nil
 }
