@@ -477,8 +477,6 @@ func TestHandleStorageSizeChange(t *testing.T) {
 		},
 	}
 
-	config.SetMonitoringCRName("test")
-
 	s := scheme.Scheme
 	mcov1beta1.SchemeBuilder.AddToScheme(s)
 	objs := []runtime.Object{
