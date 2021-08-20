@@ -24,25 +24,22 @@ const (
 	rolebindingName = "open-cluster-management:endpoint-observability-operator-rb"
 )
 
-var (
-	templatePath = "/usr/local/manifests/endpoint-observability"
-)
-
+// loadTemplates load manifests from manifests directory
 func loadTemplates(mco *mcov1beta2.MultiClusterObservability) (
 	[]runtime.RawExtension, *apiextensionsv1.CustomResourceDefinition, *apiextensionsv1beta1.CustomResourceDefinition, *appsv1.Deployment, error) {
-	templateRenderer := templates.NewTemplateRenderer(templatePath)
-	resourceList := []*resource.Resource{}
-	err := templateRenderer.AddTemplateFromPath(templatePath, &resourceList)
+	// render endpoint-observability templates
+	endpointObsTemplates, err := templates.GetTemplateRenderer().GetOrLoadEndpointObservabilityTemplates()
 	if err != nil {
 		log.Error(err, "Failed to load templates")
 		return nil, nil, nil, nil, err
 	}
+
 	crdv1 := &apiextensionsv1.CustomResourceDefinition{}
 	crdv1beta1 := &apiextensionsv1beta1.CustomResourceDefinition{}
 	dep := &appsv1.Deployment{}
 	rawExtensionList := []runtime.RawExtension{}
-	for _, r := range resourceList {
-		obj, err := updateRes(r, mco)
+	for _, r := range endpointObsTemplates {
+		obj, err := renderWithCR(r, mco)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -61,7 +58,7 @@ func loadTemplates(mco *mcov1beta2.MultiClusterObservability) (
 	return rawExtensionList, crdv1, crdv1beta1, dep, nil
 }
 
-func updateRes(r *resource.Resource,
+func renderWithCR(r *resource.Resource,
 	mco *mcov1beta2.MultiClusterObservability) (runtime.Object, error) {
 
 	kind := r.GetKind()

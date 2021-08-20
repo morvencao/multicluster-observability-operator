@@ -61,7 +61,6 @@ type PlacementRuleReconciler struct {
 	Log        logr.Logger
 	Scheme     *runtime.Scheme
 	CRDMap     map[string]bool
-	APIReader  client.Reader
 	RESTMapper meta.RESTMapper
 }
 
@@ -392,7 +391,7 @@ func createManagedClusterRes(client client.Client, restMapper meta.RESTMapper,
 		return err
 	}
 
-	err = util.CreateManagedClusterAddonCR(client, namespace)
+	err = util.CreateManagedClusterAddonCR(client, namespace, ownerLabelKey, ownerLabelValue)
 	if err != nil {
 		log.Error(err, "Failed to create ManagedClusterAddon")
 		return err
@@ -748,7 +747,6 @@ func StartPlacementController(mgr manager.Manager, crdMap map[string]bool) error
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controllers").WithName("PlacementRule"),
 		Scheme:     mgr.GetScheme(),
-		APIReader:  mgr.GetAPIReader(),
 		CRDMap:     crdMap,
 		RESTMapper: mgr.GetRESTMapper(),
 	}).SetupWithManager(mgr); err != nil {

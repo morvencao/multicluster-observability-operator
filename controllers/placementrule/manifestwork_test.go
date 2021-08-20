@@ -157,7 +157,10 @@ func TestManifestWork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get work dir: (%v)", err)
 	}
-	templatePath = path.Join(wd, "../../manifests/endpoint-observability")
+	testManifestsPath := path.Join(wd, "../../tests/manifests")
+	manifestsPath := path.Join(wd, "../../manifests")
+	os.Setenv("TEMPLATES_PATH", testManifestsPath)
+	err = os.Symlink(manifestsPath, testManifestsPath)
 
 	works, crdWork, _, dep, hubInfo, err := getGlobalManifestResources(c, newTestMCO())
 	if err != nil {
@@ -211,6 +214,10 @@ func TestManifestWork(t *testing.T) {
 	err = c.Get(context.TODO(), types.NamespacedName{Name: namespace + workNameSuffix, Namespace: namespace}, found)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Fatalf("Manifestwork not deleted: (%v)", err)
+	}
+
+	if err = os.Remove(testManifestsPath); err != nil {
+		t.Fatalf("Failed to delete symbollink(%s) for the test manifests: (%v)", testManifestsPath, err)
 	}
 }
 

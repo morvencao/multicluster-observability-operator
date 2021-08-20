@@ -27,6 +27,7 @@ require (
 )
 
 replace (
+	github.com/IBM/controller-filtered-cache => github.com/morvencao/controller-filtered-cache v0.2.3-0.20210819035548-68e97f281f58
 	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe
 	github.com/metal3-io/cluster-api-provider-baremetal => github.com/openshift/cluster-api-provider-baremetal v0.0.0-20190821174549-a2a477909c1d
 	github.com/open-cluster-management/api => github.com/open-cluster-management/api v0.0.0-20210409125704-06f2aec1a73f

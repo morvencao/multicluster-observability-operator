@@ -37,6 +37,7 @@ import (
 	mcoshared "github.com/open-cluster-management/multicluster-observability-operator/api/shared"
 	mcov1beta2 "github.com/open-cluster-management/multicluster-observability-operator/api/v1beta2"
 	"github.com/open-cluster-management/multicluster-observability-operator/pkg/config"
+	"github.com/open-cluster-management/multicluster-observability-operator/pkg/rendering/templates"
 )
 
 func init() {
@@ -619,6 +620,7 @@ func TestImageReplaceForMCO(t *testing.T) {
 	testManifestsPath := path.Join(wd, "../../tests/manifests")
 	manifestsPath := path.Join(wd, "../../manifests")
 	os.Setenv("TEMPLATES_PATH", testManifestsPath)
+	templates.GetTemplateRenderer().ResetTemplates()
 	err = os.Symlink(manifestsPath, testManifestsPath)
 	if err != nil {
 		t.Fatalf("Failed to create symbollink(%s) to(%s) for the test manifests: (%v)", testManifestsPath, manifestsPath, err)

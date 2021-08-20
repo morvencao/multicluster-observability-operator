@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	mcov1beta2 "github.com/open-cluster-management/multicluster-observability-operator/api/v1beta2"
-	placemengctrl "github.com/open-cluster-management/multicluster-observability-operator/controllers/placementrule"
+	placementctrl "github.com/open-cluster-management/multicluster-observability-operator/controllers/placementrule"
 	"github.com/open-cluster-management/multicluster-observability-operator/pkg/certificates"
 	certctrl "github.com/open-cluster-management/multicluster-observability-operator/pkg/certificates"
 	"github.com/open-cluster-management/multicluster-observability-operator/pkg/config"
@@ -111,18 +111,16 @@ func (r *MultiClusterObservabilityReconciler) Reconcile(ctx context.Context, req
 
 	// start to update mco status
 	StartStatusUpdate(r.Client, instance)
-
 	if os.Getenv("UNIT_TEST") != "true" {
 		pmCrdExists, _ := r.CRDMap[config.PlacementRuleCrdName]
 		if pmCrdExists {
 			// start placement controller
-			placemengctrl.StartPlacementController(r.Manager, r.CRDMap)
+			placementctrl.StartPlacementController(r.Manager, r.CRDMap)
 		}
 
 		// setup ocm addon manager
 		certctrl.Start(r.Client)
 	}
-
 	// Init finalizers
 	isTerminating, err := r.initFinalization(instance)
 	if err != nil {
@@ -166,7 +164,7 @@ func (r *MultiClusterObservabilityReconciler) Reconcile(ctx context.Context, req
 	instance.Spec.StorageConfig.StorageClass = storageClassSelected
 	//Render the templates with a specified CR
 	renderer := rendering.NewRenderer(instance)
-	toDeploy, err := renderer.Render(r.Client)
+	toDeploy, err := renderer.Render()
 	if err != nil {
 		reqLogger.Error(err, "Failed to render multiClusterMonitoring templates")
 		return ctrl.Result{}, err
