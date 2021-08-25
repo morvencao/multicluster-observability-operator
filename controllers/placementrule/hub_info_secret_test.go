@@ -111,7 +111,7 @@ func TestNewSecret(t *testing.T) {
 	objs := []runtime.Object{newTestObsApiRoute(), newTestAlertmanagerRoute(), newTestIngressController(), newTestRouteCASecret()}
 	c := fake.NewFakeClient(objs...)
 
-	hubInfo, err := newHubInfoSecret(c, mcoNamespace, namespace, newTestMCO())
+	hubInfo, err := generateHubInfoSecret(c, mcoNamespace, namespace)
 	if err != nil {
 		t.Fatalf("Failed to initial the hub info secret: (%v)", err)
 	}
@@ -131,7 +131,7 @@ func TestNewBYOSecret(t *testing.T) {
 	objs := []runtime.Object{newTestObsApiRoute(), newTestAlertmanagerRoute(), newTestAmRouteBYOCA(), newTestAmRouteBYOCert()}
 	c := fake.NewFakeClient(objs...)
 
-	hubInfo, err := newHubInfoSecret(c, mcoNamespace, namespace, newTestMCO())
+	hubInfo, err := generateHubInfoSecret(c, mcoNamespace, namespace)
 	if err != nil {
 		t.Fatalf("Failed to initial the hub info secret: (%v)", err)
 	}

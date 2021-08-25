@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	mcov1beta2 "github.com/open-cluster-management/multicluster-observability-operator/api/v1beta2"
 	"github.com/open-cluster-management/multicluster-observability-operator/pkg/config"
 )
 
@@ -31,8 +30,10 @@ type HubInfo struct {
 	AlertmanagerRouterCA     string `yaml:"alertmanager-router-ca"`
 }
 
-func newHubInfoSecret(client client.Client, obsNamespace string,
-	namespace string, mco *mcov1beta2.MultiClusterObservability) (*corev1.Secret, error) {
+// generateHubInfoSecret generates the secret that contains hubInfo.
+// this function should only called when the watched resources are created/updated
+func generateHubInfoSecret(client client.Client, obsNamespace string,
+	namespace string) (*corev1.Secret, error) {
 	obsApiEp, err := config.GetObsAPIUrl(client, obsNamespace)
 	if err != nil {
 		log.Error(err, "Failed to get api gateway")
