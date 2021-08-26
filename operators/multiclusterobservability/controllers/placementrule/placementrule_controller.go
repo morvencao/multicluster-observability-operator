@@ -409,6 +409,7 @@ func updateManagedClusterList(obj client.Object) {
 // SetupWithManager sets up the controller with the Manager.
 func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	c := mgr.GetClient()
+	ingressCtlCrdExists, _ := r.CRDMap[config.IngressControllerCRD]
 	clusterPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			log.Info("CreateFunc", "managedCluster", e.Object.GetName())
@@ -552,7 +553,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if e.Object.GetName() == config.OpenshiftIngressOperatorCRName &&
 				e.Object.GetNamespace() == config.OpenshiftIngressOperatorNamespace {
 				// generate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -562,7 +563,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				e.ObjectNew.GetResourceVersion() != e.ObjectOld.GetResourceVersion() &&
 				e.ObjectNew.GetNamespace() == config.OpenshiftIngressOperatorNamespace {
 				// regenerate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -571,7 +572,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if e.Object.GetName() == config.OpenshiftIngressOperatorCRName &&
 				e.Object.GetNamespace() == config.OpenshiftIngressOperatorNamespace {
 				// regenerate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -584,7 +585,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				(e.Object.GetName() == config.AlertmanagerRouteBYOCAName ||
 					e.Object.GetName() == config.AlertmanagerRouteBYOCERTName) {
 				// generate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -595,7 +596,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				(e.ObjectNew.GetName() == config.AlertmanagerRouteBYOCAName ||
 					e.ObjectNew.GetName() == config.AlertmanagerRouteBYOCERTName) {
 				// regenerate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -605,7 +606,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				(e.Object.GetName() == config.AlertmanagerRouteBYOCAName ||
 					e.Object.GetName() == config.AlertmanagerRouteBYOCERTName) {
 				// regenerate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -619,7 +620,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				(e.Object.GetNamespace() == config.OpenshiftIngressNamespace &&
 					e.Object.GetName() == config.OpenshiftIngressDefaultCertName) {
 				// generate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -631,7 +632,7 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					e.ObjectNew.GetName() == config.OpenshiftIngressDefaultCertName)) &&
 				e.ObjectNew.GetResourceVersion() != e.ObjectOld.GetResourceVersion() {
 				// regenerate the hubInfo secret
-				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace)
+				hubInfoSecret, _ = generateHubInfoSecret(c, config.GetDefaultNamespace(), spokeNameSpace, ingressCtlCrdExists)
 				return true
 			}
 			return false
@@ -748,7 +749,6 @@ func (r *PlacementRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		}
 
-		ingressCtlCrdExists, _ := r.CRDMap[config.IngressControllerCRD]
 		if ingressCtlCrdExists {
 			// secondary watch for default ingresscontroller
 			ctrBuilder = ctrBuilder.Watches(&source.Kind{Type: &operatorv1.IngressController{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(ingressControllerPred)).
